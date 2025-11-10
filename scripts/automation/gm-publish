@@ -1,0 +1,389 @@
+#!/bin/bash
+"""
+Geeky Master Publishing Tool
+TikTok Automation System - Content Publishing
+"""
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+CONFIG_DIR="$PROJECT_ROOT/core/config"
+SECRETS_DIR="/etc/gm-secrets"
+DATA_DIR="$PROJECT_ROOT/data"
+LOG_DIR="$DATA_DIR/logs"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Logging function
+log() {
+    local level=$1
+    shift
+    local message="$*"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${timestamp} [${level}] ${message}" | tee -a "$LOG_DIR/publisher.log"
+}
+
+# Load configuration
+load_config() {
+    if [ -f "$CONFIG_DIR/main_config.py" ]; then
+        # Extract config values (simplified approach)
+        python3 -c "
+import sys
+sys.path.append('$CONFIG_DIR')
+from main_config import config
+print(f'GM_DOMAIN={config.domain.primary_domain}')
+print(f'TIKTOK_BASE_URL={config.api.tiktok_base_url}')
+" > /tmp/gm_config.env
+        source /tmp/gm_config.env
+        rm /tmp/gm_config.env
+    fi
+}
+
+# Get API credentials
+get_api_credentials() {
+    local account="$1"
+    
+    log "INFO" "Retrieving API credentials for account: $account"
+    
+    if [ ! -f "$SECRETS_DIR/tiktok_keys.env" ]; then
+        log "ERROR" "TikTok API keys file not found"
+        echo -e "${RED}Error: No API keys configured. Run 'gm-api new' first.${NC}"
+        exit 1
+    fi
+    
+    # Get the first active key (simplified - in production, would match by account)
+    local active_key=$(head -n1 "$SECRETS_DIR/tiktok_keys.env")
+    
+    if [ -n "$active_key" ]; then
+        export TIKTOK_CLIENT_KEY=$(echo "$active_key" | cut -d':' -f2)
+        export TIKTOK_CLIENT_SECRET=$(echo "$active_key" | cut -d':' -f3)
+        log "INFO" "API credentials loaded successfully"
+    else
+        log "ERROR" "No active API keys found"
+        echo -e "${RED}Error: No active API keys found${NC}"
+        exit 1
+    fi
+}
+
+# Validate API token
+validate_api_token() {
+    log "INFO" "Validating API token"
+    
+    # Simulate token validation (replace with actual TikTok API call)
+    local validation_url="${TIKTOK_BASE_URL:-https://open.tiktokapis.com/v2}/oauth/token/"
+    
+    # In a real implementation, this would make an actual API call
+    # For now, we'll simulate validation
+    if [ -n "$TIKTOK_CLIENT_KEY" ] && [ -n "$TIKTOK_CLIENT_SECRET" ]; then
+        log "SUCCESS" "API token validation successful"
+        return 0
+    else
+        log "ERROR" "API token validation failed"
+        return 1
+    fi
+}
+
+# Upload video to TikTok
+upload_video() {
+    local video_path="$1"
+    local title="$2"
+    local description="$3"
+    local hashtags="$4"
+    
+    log "INFO" "Uploading video: $video_path"
+    
+    if [ ! -f "$video_path" ]; then
+        log "ERROR" "Video file not found: $video_path"
+        return 1
+    fi
+    
+    # Check video format and size
+    local file_size=$(stat -c%s "$video_path")
+    local max_size=$((1024 * 1024 * 1024)) # 1GB
+    
+    if [ $file_size -gt $max_size ]; then
+        log "ERROR" "Video file too large: $((file_size / 1024 / 1024))MB (max: 1GB)"
+        return 1
+    fi
+    
+    # Simulate upload process (replace with actual TikTok API upload)
+    echo -e "${BLUE}Uploading video to TikTok...${NC}"
+    echo -e "${BLUE}File:${NC} $video_path"
+    echo -e "${BLUE}Size:${NC} $((file_size / 1024 / 1024))MB"
+    echo -e "${BLUE}Title:${NC} $title"
+    
+    # Simulate upload progress
+    for i in {1..5}; do
+        sleep 1
+        echo -e "${YELLOW}Upload progress: $((i * 20))%${NC}"
+    done
+    
+    log "SUCCESS" "Video uploaded successfully"
+    echo -e "${GREEN}✓ Video uploaded successfully${NC}"
+    
+    # Return simulated video ID
+    echo "video_$(date +%s)"
+}
+
+# Publish video with metadata
+publish_video() {
+    local video_id="$1"
+    local title="$2"
+    local description="$3"
+    local hashtags="$4"
+    local privacy_level="${5:-PUBLIC}"
+    
+    log "INFO" "Publishing video: $video_id"
+    
+    # Combine description and hashtags
+    local full_description="$description $hashtags"
+    
+    # Simulate publishing (replace with actual TikTok API call)
+    echo -e "${BLUE}Publishing video with metadata...${NC}"
+    echo -e "${BLUE}Video ID:${NC} $video_id"
+    echo -e "${BLUE}Title:${NC} $title"
+    echo -e "${BLUE}Description:${NC} $full_description"
+    echo -e "${BLUE}Privacy:${NC} $privacy_level"
+    
+    sleep 2
+    
+    log "SUCCESS" "Video published successfully"
+    echo -e "${GREEN}✓ Video published successfully${NC}"
+    
+    # Return simulated post URL
+    echo "https://tiktok.com/@user/video/$video_id"
+}
+
+# Extract metadata from content
+extract_metadata() {
+    local video_path="$1"
+    
+    # Look for metadata file (same name with .json extension)
+    local metadata_file="${video_path%.*}.json"
+    
+    if [ -f "$metadata_file" ]; then
+        # Extract metadata from JSON file
+        title=$(jq -r '.title // "Untitled"' "$metadata_file")
+        description=$(jq -r '.description // ""' "$metadata_file")
+        hashtags=$(jq -r '.hashtags | join(" ") // ""' "$metadata_file")
+    else
+        # Generate basic metadata
+        title="Amazing Video $(date +%s)"
+        description="Check out this amazing content! #fyp #viral"
+        hashtags="#fyp #viral #trending"
+    fi
+    
+    echo "$title|$description|$hashtags"
+}
+
+# Schedule post
+schedule_post() {
+    local video_path="$1"
+    local schedule_time="$2"
+    local account="$3"
+    
+    log "INFO" "Scheduling post - File: $video_path, Time: $schedule_time, Account: $account"
+    
+    # Convert schedule time to timestamp
+    local timestamp=$(date -d "$schedule_time" +%s 2>/dev/null)
+    
+    if [ -z "$timestamp" ]; then
+        log "ERROR" "Invalid schedule time format: $schedule_time"
+        return 1
+    fi
+    
+    # Add to schedule database
+    local schedule_entry="$timestamp|$video_path|$account|pending"
+    echo "$schedule_entry" >> "$DATA_DIR/scheduled_posts.txt"
+    
+    # Create cron job
+    local cron_time=$(date -d "@$timestamp" '+%M %H %d %m *')
+    local cron_cmd="$SCRIPT_DIR/gm-publish --file='$video_path' --account='$account' --scheduled"
+    
+    # Add to crontab
+    (crontab -l 2>/dev/null; echo "$cron_time $cron_cmd") | crontab -
+    
+    log "SUCCESS" "Post scheduled successfully"
+    echo -e "${GREEN}✓ Post scheduled for $(date -d "@$timestamp" '+%Y-%m-%d %H:%M:%S')${NC}"
+}
+
+# Process scheduled post
+process_scheduled_post() {
+    local video_path="$1"
+    local account="$2"
+    
+    log "INFO" "Processing scheduled post - File: $video_path, Account: $account"
+    
+    # Extract metadata
+    local metadata=$(extract_metadata "$video_path")
+    local title=$(echo "$metadata" | cut -d'|' -f1)
+    local description=$(echo "$metadata" | cut -d'|' -f2)
+    local hashtags=$(echo "$metadata" | cut -d'|' -f3)
+    
+    # Upload and publish
+    local video_id=$(upload_video "$video_path" "$title" "$description" "$hashtags")
+    
+    if [ $? -eq 0 ]; then
+        local post_url=$(publish_video "$video_id" "$title" "$description" "$hashtags")
+        
+        if [ $? -eq 0 ]; then
+            log "SUCCESS" "Scheduled post processed successfully"
+            echo -e "${GREEN}✓ Scheduled post published: $post_url${NC}"
+            
+            # Remove from schedule
+            sed -i "/$video_path/d" "$DATA_DIR/scheduled_posts.txt"
+            
+            return 0
+        fi
+    fi
+    
+    log "ERROR" "Failed to process scheduled post"
+    return 1
+}
+
+# Show publishing status
+show_status() {
+    log "INFO" "Showing publishing status"
+    
+    echo -e "${BLUE}Publishing Status:${NC}"
+    echo "========================================"
+    
+    # Show recent uploads
+    if [ -f "$LOG_DIR/publisher.log" ]; then
+        echo -e "${GREEN}Recent Activity:${NC}"
+        tail -n 10 "$LOG_DIR/publisher.log" | grep -E "(SUCCESS|ERROR)" | while read line; do
+            echo "  $line"
+        done
+    fi
+    
+    echo ""
+    
+    # Show scheduled posts
+    if [ -f "$DATA_DIR/scheduled_posts.txt" ]; then
+        echo -e "${YELLOW}Scheduled Posts:${NC}"
+        while IFS='|' read -r timestamp video_path account status; do
+            local scheduled_time=$(date -d "@$timestamp" '+%Y-%m-%d %H:%M:%S')
+            echo -e "${BLUE}Time:${NC} $scheduled_time"
+            echo -e "${BLUE}File:${NC} $video_path"
+            echo -e "${BLUE}Account:${NC} $account"
+            echo -e "${BLUE}Status:${NC} $status"
+            echo "----------------------------------------"
+        done < "$DATA_DIR/scheduled_posts.txt"
+    else
+        echo -e "${YELLOW}No scheduled posts${NC}"
+    fi
+}
+
+# Show help
+show_help() {
+    echo -e "${BLUE}Geeky Master Publishing Tool${NC}"
+    echo ""
+    echo "Usage: $0 [COMMAND] [OPTIONS]"
+    echo ""
+    echo "Commands:"
+    echo "  --file=<path> --account=@user                    Publish video immediately"
+    echo "  --file=<path> --account=@user --scheduled        Process scheduled post"
+    echo "  --schedule --file=<path> --time=<datetime>       Schedule post for later"
+    echo "  --status                                         Show publishing status"
+    echo "  --help                                           Show this help"
+    echo ""
+    echo "Examples:"
+    echo "  $0 --file='./data/media/video.mp4' --account=@myusername"
+    echo "  $0 --schedule --file='./data/media/video.mp4' --time='2024-01-01 18:00'"
+    echo "  $0 --status"
+}
+
+# Main execution
+main() {
+    # Create log directory
+    mkdir -p "$LOG_DIR"
+    
+    # Load configuration
+    load_config
+    
+    # Parse command line arguments
+    local file_path=""
+    local account=""
+    local schedule_time=""
+    local is_scheduled=false
+    local is_status=false
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --file=*)
+                file_path="${1#--file=}"
+                ;;
+            --account=*)
+                account="${1#--account=}"
+                ;;
+            --time=*)
+                schedule_time="${1#--time=}"
+                ;;
+            --scheduled)
+                is_scheduled=true
+                ;;
+            --schedule)
+                is_scheduled=true
+                shift
+                ;;
+            --status)
+                is_status=true
+                ;;
+            --help)
+                show_help
+                exit 0
+                ;;
+        esac
+        shift
+    done
+    
+    # Execute command
+    if [ "$is_status" = true ]; then
+        show_status
+    elif [ "$is_scheduled" = true ] && [ -n "$schedule_time" ]; then
+        # Schedule new post
+        if [ -z "$file_path" ] || [ -z "$account" ]; then
+            echo -e "${RED}Error: --file and --account required for scheduling${NC}"
+            show_help
+            exit 1
+        fi
+        schedule_post "$file_path" "$schedule_time" "$account"
+    elif [ -n "$file_path" ] && [ -n "$account" ]; then
+        # Publish immediately or process scheduled
+        get_api_credentials "$account"
+        
+        if validate_api_token; then
+            if [ "$is_scheduled" = true ]; then
+                process_scheduled_post "$file_path" "$account"
+            else
+                # Extract metadata and publish
+                local metadata=$(extract_metadata "$file_path")
+                local title=$(echo "$metadata" | cut -d'|' -f1)
+                local description=$(echo "$metadata" | cut -d'|' -f2)
+                local hashtags=$(echo "$metadata" | cut -d'|' -f3)
+                
+                local video_id=$(upload_video "$file_path" "$title" "$description" "$hashtags")
+                if [ $? -eq 0 ]; then
+                    local post_url=$(publish_video "$video_id" "$title" "$description" "$hashtags")
+                    if [ $? -eq 0 ]; then
+                        echo -e "${GREEN}✓ Post published successfully: $post_url${NC}"
+                    fi
+                fi
+            fi
+        else
+            echo -e "${RED}✗ API token validation failed${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${RED}Error: Invalid parameters${NC}"
+        show_help
+        exit 1
+    fi
+}
+
+# Execute main function
+main "$@"

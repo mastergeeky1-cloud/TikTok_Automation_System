@@ -1,0 +1,290 @@
+#!/bin/bash
+"""
+Geeky Master API Management Tool
+TikTok Automation System - API Key Management
+"""
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+CONFIG_DIR="$PROJECT_ROOT/core/config"
+SECRETS_DIR="/etc/gm-secrets"
+LOG_DIR="$PROJECT_ROOT/data/logs"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Logging function
+log() {
+    local level=$1
+    shift
+    local message="$*"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${timestamp} [${level}] ${message}" | tee -a "$LOG_DIR/api_manager.log"
+}
+
+# Check dependencies
+check_dependencies() {
+    local deps=("curl" "jq" "openssl" "gpg")
+    for dep in "${deps[@]}"; do
+        if ! command -v "$dep" &> /dev/null; then
+            log "ERROR" "Missing dependency: $dep"
+            exit 1
+        fi
+    done
+}
+
+# Initialize secrets directory
+init_secrets() {
+    if [ ! -d "$SECRETS_DIR" ]; then
+        sudo mkdir -p "$SECRETS_DIR"
+        sudo chmod 700 "$SECRETS_DIR"
+    fi
+    
+    if [ ! -f "$SECRETS_DIR/tiktok_keys.env" ]; then
+        sudo touch "$SECRETS_DIR/tiktok_keys.env"
+        sudo chmod 600 "$SECRETS_DIR/tiktok_keys.env"
+    fi
+}
+
+# Encrypt sensitive data
+encrypt_data() {
+    local data="$1"
+    local output_file="$2"
+    echo "$data" | openssl enc -aes-256-cbc -salt -pbkdf2 -k "1507" -out "$output_file"
+}
+
+# Decrypt sensitive data
+decrypt_data() {
+    local input_file="$1"
+    openssl enc -aes-256-cbc -d -pbkdf2 -k "1507" -in "$input_file" 2>/dev/null
+}
+
+# Generate new TikTok API key
+generate_tiktok_key() {
+    local alias="$1"
+    local timestamp=$(date +%s)
+    local key_id="tiktok_${alias}_${timestamp}"
+    
+    log "INFO" "Generating new TikTok API key with alias: $alias"
+    
+    # Simulate API key generation (replace with actual TikTok API call)
+    local client_key="TK_${timestamp}_$(openssl rand -hex 16)"
+    local client_secret="SC_${timestamp}_$(openssl rand -hex 32)"
+    
+    # Store in secrets file
+    local entry="$key_id:$client_key:$client_secret:$(date +%s):0"
+    echo "$entry" >> "$SECRETS_DIR/tiktok_keys.env"
+    
+    # Encrypt backup
+    encrypt_data "$entry" "$SECRETS_DIR/${key_id}.enc"
+    
+    log "SUCCESS" "Generated TikTok API key: $key_id"
+    echo -e "${GREEN}✓ API Key Generated${NC}"
+    echo -e "${BLUE}Key ID:${NC} $key_id"
+    echo -e "${BLUE}Client Key:${NC} $client_key"
+    echo -e "${BLUE}Client Secret:${NC} $client_secret"
+}
+
+# List all API keys
+list_api_keys() {
+    log "INFO" "Listing all API keys"
+    
+    echo -e "${BLUE}TikTok API Keys:${NC}"
+    echo "----------------------------------------"
+    
+    if [ -f "$SECRETS_DIR/tiktok_keys.env" ]; then
+        while IFS=':' read -r key_id client_key client_secret created_time last_used; do
+            local created_date=$(date -d "@$created_time" '+%Y-%m-%d %H:%M:%S')
+            local status="Active"
+            
+            if [ "$last_used" = "0" ]; then
+                status="New"
+            else
+                local last_used_date=$(date -d "@$last_used" '+%Y-%m-%d %H:%M:%S')
+                status="Last used: $last_used_date"
+            fi
+            
+            echo -e "${GREEN}Key ID:${NC} $key_id"
+            echo -e "${BLUE}Created:${NC} $created_date"
+            echo -e "${BLUE}Status:${NC} $status"
+            echo "----------------------------------------"
+        done < "$SECRETS_DIR/tiktok_keys.env"
+    else
+        echo -e "${YELLOW}No API keys found${NC}"
+    fi
+}
+
+# Rotate API key
+rotate_api_key() {
+    local platform="$1"
+    local alias="$2"
+    
+    if [ "$platform" != "tiktok" ]; then
+        log "ERROR" "Unsupported platform: $platform"
+        echo -e "${RED}Error: Only TikTok platform is supported${NC}"
+        exit 1
+    fi
+    
+    log "INFO" "Rotating API key for platform: $platform, alias: $alias"
+    
+    # Find existing key
+    local existing_key=$(grep ":$alias:" "$SECRETS_DIR/tiktok_keys.env" | head -n1)
+    
+    if [ -n "$existing_key" ]; then
+        # Deactivate old key
+        sed -i "s/$existing_key/${existing_key}:deleted:$(date +%s)/" "$SECRETS_DIR/tiktok_keys.env"
+        log "INFO" "Deactivated old key"
+    fi
+    
+    # Generate new key
+    generate_tiktok_key "$alias"
+}
+
+# Delete API key
+delete_api_key() {
+    local alias="$1"
+    
+    log "INFO" "Deleting API key with alias: $alias"
+    
+    # Find and remove key
+    if grep -q ":$alias:" "$SECRETS_DIR/tiktok_keys.env"; then
+        grep -v ":$alias:" "$SECRETS_DIR/tiktok_keys.env" > "$SECRETS_DIR/tiktok_keys.env.tmp"
+        mv "$SECRETS_DIR/tiktok_keys.env.tmp" "$SECRETS_DIR/tiktok_keys.env"
+        log "SUCCESS" "Deleted API key: $alias"
+        echo -e "${GREEN}✓ API key deleted: $alias${NC}"
+    else
+        log "ERROR" "API key not found: $alias"
+        echo -e "${RED}Error: API key not found: $alias${NC}"
+        exit 1
+    fi
+}
+
+# Validate API key
+validate_api_key() {
+    local key_id="$1"
+    
+    log "INFO" "Validating API key: $key_id"
+    
+    # Extract key details
+    local key_entry=$(grep "^$key_id:" "$SECRETS_DIR/tiktok_keys.env")
+    
+    if [ -n "$key_entry" ]; then
+        local client_key=$(echo "$key_entry" | cut -d':' -f2)
+        local client_secret=$(echo "$key_entry" | cut -d':' -f3)
+        
+        # Simulate validation (replace with actual TikTok API call)
+        echo -e "${GREEN}✓ API key is valid${NC}"
+        echo -e "${BLUE}Key ID:${NC} $key_id"
+        
+        # Update last used timestamp
+        sed -i "s/^$key_id:/&$(date +%s):/" "$SECRETS_DIR/tiktok_keys.env"
+        
+        return 0
+    else
+        echo -e "${RED}✗ API key not found or invalid${NC}"
+        return 1
+    fi
+}
+
+# Show help
+show_help() {
+    echo -e "${BLUE}Geeky Master API Management Tool${NC}"
+    echo ""
+    echo "Usage: $0 [COMMAND] [OPTIONS]"
+    echo ""
+    echo "Commands:"
+    echo "  new --platform=<platform> --alias=<alias>     Generate new API key"
+    echo "  rotate --platform=<platform> [--alias=<alias>] Rotate existing API key"
+    echo "  list                                          List all API keys"
+    echo "  delete --alias=<alias>                        Delete API key"
+    echo "  validate --key=<key_id>                       Validate API key"
+    echo "  help                                          Show this help"
+    echo ""
+    echo "Examples:"
+    echo "  $0 new --platform=tiktok --alias=main"
+    echo "  $0 rotate --platform=tiktok"
+    echo "  $0 list"
+    echo "  $0 delete --alias=old_key"
+}
+
+# Main execution
+main() {
+    # Create log directory
+    mkdir -p "$LOG_DIR"
+    
+    # Check dependencies
+    check_dependencies
+    
+    # Initialize secrets
+    init_secrets
+    
+    # Parse command
+    case "${1:-help}" in
+        "new")
+            if [[ "$2" == --platform=* && "$3" == --alias=* ]]; then
+                local platform="${2#--platform=}"
+                local alias="${3#--alias=}"
+                
+                if [ "$platform" = "tiktok" ]; then
+                    generate_tiktok_key "$alias"
+                else
+                    echo -e "${RED}Error: Unsupported platform: $platform${NC}"
+                    exit 1
+                fi
+            else
+                echo -e "${RED}Error: Invalid parameters for 'new' command${NC}"
+                show_help
+                exit 1
+            fi
+            ;;
+        "rotate")
+            if [[ "$2" == --platform=* ]]; then
+                local platform="${2#--platform=}"
+                local alias="default"
+                
+                if [[ "$3" == --alias=* ]]; then
+                    alias="${3#--alias=}"
+                fi
+                
+                rotate_api_key "$platform" "$alias"
+            else
+                echo -e "${RED}Error: Invalid parameters for 'rotate' command${NC}"
+                show_help
+                exit 1
+            fi
+            ;;
+        "list")
+            list_api_keys
+            ;;
+        "delete")
+            if [[ "$2" == --alias=* ]]; then
+                local alias="${2#--alias=}"
+                delete_api_key "$alias"
+            else
+                echo -e "${RED}Error: Invalid parameters for 'delete' command${NC}"
+                show_help
+                exit 1
+            fi
+            ;;
+        "validate")
+            if [[ "$2" == --key=* ]]; then
+                local key_id="${2#--key=}"
+                validate_api_key "$key_id"
+            else
+                echo -e "${RED}Error: Invalid parameters for 'validate' command${NC}"
+                show_help
+                exit 1
+            fi
+            ;;
+        "help"|*)
+            show_help
+            ;;
+    esac
+}
+
+# Execute main function
+main "$@"

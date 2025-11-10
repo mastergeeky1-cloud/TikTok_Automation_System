@@ -1,0 +1,147 @@
+{
+  "name": "tiktok-automation-system",
+  "version": "2.0.0",
+  "description": "Geeky Workflow Core v2.0 - Professional TikTok Content Automation",
+  "main": "scripts/deployment/setup.js",
+  "scripts": {
+    "start": "node scripts/deployment/setup.js",
+    "dev": "nodemon scripts/deployment/setup.js",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "webpack --mode production",
+    "build:server": "babel server -d dist",
+    "test": "jest",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "format": "prettier --write .",
+    "setup": "bash scripts/deployment/setup.sh",
+    "dashboard": "node scripts/monitoring/start-dashboard.js",
+    "content": "node scripts/content/generate-content.js",
+    "api": "node scripts/api/manage-api.js",
+    "system": "node scripts/system/control-system.js"
+  },
+  "keywords": [
+    "tiktok",
+    "automation",
+    "content-generation",
+    "social-media",
+    "ai",
+    "video-processing",
+    "scheduling",
+    "monitoring"
+  ],
+  "author": "Geeky Master",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/geeky-master/tiktok-automation-system"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "dotenv": "^16.3.1",
+    "axios": "^1.5.0",
+    "lodash": "^4.17.21",
+    "moment": "^2.29.4",
+    "node-cron": "^3.0.2",
+    "bull": "^4.11.3",
+    "ioredis": "^5.3.2",
+    "winston": "^3.10.0",
+    "morgan": "^1.10.0",
+    "compression": "^1.7.4",
+    "express-rate-limit": "^6.10.0",
+    "express-validator": "^7.0.1",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "multer": "^1.4.5-lts.1",
+    "sharp": "^0.32.5",
+    "ffmpeg-static": "^5.2.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "node-fetch": "^3.3.2",
+    "cheerio": "^1.0.0-rc.12",
+    "puppeteer": "^21.1.1",
+    "ws": "^8.14.0",
+    "socket.io": "^4.7.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "eslint": "^8.49.0",
+    "prettier": "^3.0.3",
+    "@babel/core": "^7.22.20",
+    "@babel/cli": "^7.22.15",
+    "@babel/preset-env": "^7.22.20",
+    "webpack": "^5.88.2",
+    "webpack-cli": "^5.1.4",
+    "babel-loader": "^9.1.3",
+    "css-loader": "^6.8.1",
+    "style-loader": "^3.3.3",
+    "html-webpack-plugin": "^5.5.3"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "optionalDependencies": {
+    "n8n": "^1.0.0",
+    "pm2": "^5.3.0"
+  },
+  "n8n": {
+    "version": "1.0.0",
+    "nodes": [
+      {
+        "name": "TikTok Content Generator",
+        "group": ["transform"],
+        "version": "1.0",
+        "description": "Generate TikTok content using AI",
+        "defaults": {
+          "name": "TikTok Content Generator",
+          "color": "#000000"
+        },
+        "inputs": ["main"],
+        "outputs": ["main"],
+        "properties": [
+          {
+            "displayName": "Topic",
+            "name": "topic",
+            "type": "string",
+            "default": "",
+            "placeholder": "Enter content topic",
+            "required": true
+          },
+          {
+            "displayName": "Template",
+            "name": "template",
+            "type": "options",
+            "options": [
+              {
+                "name": "Viral Facts",
+                "value": "viral_facts"
+              },
+              {
+                "name": "Lifestyle Tips",
+                "value": "lifestyle_tips"
+              },
+              {
+                "name": "Tech Reviews",
+                "value": "tech_reviews"
+              },
+              {
+                "name": "Entertainment",
+                "value": "entertainment"
+              }
+            ],
+            "default": "viral_facts"
+          },
+          {
+            "displayName": "Content Count",
+            "name": "count",
+            "type": "number",
+            "default": 1,
+            "required": true
+          }
+        ]
+      }
+    ]
+  }
+}

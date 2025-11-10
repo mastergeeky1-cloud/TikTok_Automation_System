@@ -1,0 +1,101 @@
+# TikTok Automation System - Python Dependencies
+# Geeky Workflow Core v2.0
+
+# Web Framework
+flask==2.3.3
+flask-cors==4.0.0
+
+# HTTP Requests
+requests==2.31.0
+urllib3==2.0.4
+
+# Image Processing
+pillow==10.0.1
+opencv-python==4.8.1.78
+wand==0.6.13
+
+# Video Processing
+moviepy==1.0.3
+ffmpeg-python==0.2.0
+
+# AI/ML Services
+openai==0.28.1
+whisper==1.1.10
+torch==2.0.1
+torchvision==0.15.2
+
+# System Monitoring
+psutil==5.9.5
+GPUtil==1.4.0
+
+# Database
+psycopg2-binary==2.9.7
+redis==5.0.0
+sqlite3
+
+# Task Scheduling
+schedule==1.2.0
+apscheduler==3.10.4
+
+# Configuration
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# Security
+cryptography==41.0.4
+bcrypt==4.0.1
+pyjwt==2.8.0
+
+# Data Processing
+pandas==2.1.1
+numpy==1.25.2
+json5==0.9.14
+
+# Logging
+structlog==23.1.0
+colorlog==6.7.0
+
+# API Development
+fastapi==0.103.2
+uvicorn==0.23.2
+
+# Image Generation (Stable Diffusion)
+diffusers==0.21.4
+transformers==4.33.2
+accelerate==0.23.0
+
+# Text-to-Speech
+gTTS==2.3.2
+pydub==0.25.1
+
+# File Processing
+python-magic==0.4.27
+mimetypes
+
+# Email Notifications
+smtplib
+email-validator==2.0.0
+
+# Web Scraping (for content research)
+beautifulsoup4==4.12.2
+selenium==4.12.0
+
+# Social Media APIs
+tweepy==4.14.0
+instagrapi==2.0.0
+
+# Utilities
+tqdm==4.66.1
+click==8.1.7
+rich==13.5.2
+typer==0.9.0
+
+# Development/Testing
+pytest==7.4.2
+pytest-asyncio==0.21.1
+black==23.9.1
+flake8==6.1.0
+
+# Production
+gunicorn==21.2.0
+supervisor==4.2.5
